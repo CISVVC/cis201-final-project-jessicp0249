@@ -2,7 +2,7 @@
 all: main
 
 
-main : 
+main : main.cpp
 	@echo "Making the executable -- some warnings can be safely ignored"
 	@g++ -o main main.cpp 
 
