@@ -30,8 +30,9 @@ public:
     void add_word(std::string word, int line);
     int find_word(std::string word);
     int get_current_line(std::ifstream &input);
+    bool is_valid_char(char c, std::ifstream &input);
     bool is_whitespace(char c);
-    bool is_punctuation(char c, std::ifstream &input);
+    bool is_punctuation(char c);
     bool is_apostrophe(char c, std::ifstream &input);
     void eat_whitespace(std::ifstream &input);
     void print();
@@ -48,9 +49,10 @@ Concordance::Concordance(std::string filename)
     m_punctuation.push_back('"');
     m_punctuation.push_back(',');
     m_punctuation.push_back(';');
-    m_punctuation.push_back(';');
+    m_punctuation.push_back(':');
     m_punctuation.push_back('.');
     m_punctuation.push_back('?');
+    m_punctuation.push_back('!');
     m_punctuation.push_back('(');
     m_punctuation.push_back(')');
     m_punctuation.push_back('/');
@@ -58,8 +60,9 @@ Concordance::Concordance(std::string filename)
     m_punctuation.push_back('-');
 }
 
-// Function will parse words from file specified in m_filename
-// Function will add words to vector m_words as Word objects
+/**
+Function parses words from file and adds them to vector m_words
+*/
 void Concordance::parse()
 {
     std::ifstream file(m_filename.c_str());
@@ -74,11 +77,12 @@ void Concordance::parse()
         else
             add_word(word, line);
         
-        std::cout << word << std::endl;
+        std::cout << word << " ";
     }
+    std::cout << std::endl << std::endl;
 }
 
-// Function will return a word from input stream
+// Function collects a word from input stream
 //@param input Input stream for function to read
 //@return word as a string
 std::string Concordance::next_word(std::ifstream &input)
@@ -89,8 +93,9 @@ std::string Concordance::next_word(std::ifstream &input)
         char c;
         input.get(c);
         if(input.eof())
-            break;
-        if(!is_whitespace(c) && !is_punctuation(c, input))
+            break;  // stop at end of file
+        // if not whitespace or punctuation, add char c to word
+        if(is_valid_char(c, input))
             word += tolower(c);
         else
         {
@@ -101,28 +106,45 @@ std::string Concordance::next_word(std::ifstream &input)
     return word;
 }
 
-// Function will find given word in vector, return position
-// @param word The word to find in vector
-// @return Position in vector. Negative int if not found.
+/**
+Function will locate given word in vector
+@param word The word to find in vector
+@return Position in vector. Negative int if not found.
+*/
 int Concordance::find_word(std::string word)
 {
+    // position is negative unless match is found
+    int position = -1;
+
     for(int i=0; i<m_words.size(); i++)
     {
+        // if match is found...
         if( word == m_words[i].get_spelling())
-            return i;
+        {
+            // ...set to current position in vector
+            position = i;
+        }
     }
     
-    // If word does not exist in vector, return negative
-    int j = -1;
-    return j;
+    return position;
 }
 
+/**
+Function will add new Word object to m_words vector
+@param s Word spelling
+@param line Line number of word
+*/
 void Concordance::add_word(std::string s, int line)
 {
    Word w(s, line); 
    m_words.push_back(w);
 }
 
+/**
+Function will calculate line number from position in file stream
+@param input File stream
+@return Line number
+*/
 int Concordance::get_current_line(std::ifstream &input)
 {
     const int LINE_LENGTH = 60;  // characters in a line
@@ -140,6 +162,27 @@ int Concordance::get_current_line(std::ifstream &input)
     return line_number;
 }
 
+/**
+Function checks whether given character is part of a word
+@param c Character to check
+@return True if character is part of a word
+*/
+bool Concordance::is_valid_char(char c, std::ifstream &input)
+{
+    // check whether c is an apostrophe
+    if(c=='\'' || c=='\'')
+        return(is_apostrophe(c, input));
+    //check whether c is whitespace or punctuation
+    else
+        return(!is_whitespace(c) && !is_punctuation(c));
+}
+
+
+/**
+Function will check whether given character is whitespace
+@param c Character to check
+@return True if character is whitespace
+*/
 bool Concordance::is_whitespace(char c)
 {
     return(c==' ' || c=='\n' || c=='\t');
@@ -148,71 +191,56 @@ bool Concordance::is_whitespace(char c)
 // Function checks whether given character is punctuation
 // @param c Character to check
 // @return If true, character is punctuation
-bool Concordance::is_punctuation(char c, std::ifstream &input)
+bool Concordance::is_punctuation(char c)
 {
-    if(c=='\'' || c=='\'')
+    for(int i=0; i<m_punctuation.size(); i++)
     {
-        return(!is_apostrophe(c, input));
+        if(c == m_punctuation[i])
+            return true;
     }
-    else
-        {
-            for(int i=0; i<m_punctuation.size(); i++)
-            {
-                if(c == m_punctuation[i])
-                    return true;
-            }
-        }
     return false;
 }
 
-// Function checks whether given character is an apostrophe
-//    or a single quote. (Single quotes have punctuation or
-//    white space next to them)
-// @param c Character to check
-// @param input File stream character came from
-// @return True if character is an apostrophe
+/**
+Function checks whether given character is an apostrophe or single quote.
+(Single quotes have punctuation or white space next to them)
+@param c Character to check
+@param input File stream character came from
+@return True if character is an apostrophe
+*/
 bool Concordance::is_apostrophe(char c, std::ifstream &input)
 {
+//    return false;
 
-    return false;
-
-#if 0
-    // if current read position is end of file
-    if(input.eof())
-        return false;
-
+#if 1
     long position = input.tellg();  // current read position in file
-    input.seekg((position - 2), std::ios::beg);  // shift read position
 
-    char d;
-    input.get(d);   // read in character right before char c
+    char b, d;  // characters before and after c
+    input.get(d);   // get character after c
+    // shift postion to read character before c
+    input.seekg((position - 3), std::ios::beg);  
+    input.get(b);   // get character before c
+    input.get(c);   // read c again to resume original position in file
 
-    if(is_whitespace(d) || is_punctuation(d, input))
-    {
-        input.seekg(position);  // restore original position
-        return false;
-    }
-    else
-    {
-       // shift position to skip over char c
-        input.seekg((position + 1), std::ios::beg);
-        input.get(d);
-        input.seekg(position);  // restore original position
-        if(is_whitespace(d) || is_punctuation(d, input))
-            return false;
-    }
+    // True if b and d are NOT whitespace or punctuation
+    return!(is_whitespace(b) || is_whitespace(d) || is_punctuation(b) || is_punctuation(d));
 #endif
 }
 
+/**
+Function consumes all whitespace and punctuation before next valid input in file stream
+@param input File stream to read
+*/
 void Concordance::eat_whitespace(std::ifstream &input)
 {
     for(;;)
     {
         char c;
-        input.get(c);
-        if(input.eof()) 
+        input.get(c);   // consume next character
+        if(input.eof())   // stop at end of file 
             break; 
-        if(!is_whitespace(c) && !is_punctuation(c, input))
+        // put character back if it's not whitespace or punctuation
+        if(is_valid_char(c, input))
         {
             input.putback(c);
             break;
@@ -220,6 +248,9 @@ void Concordance::eat_whitespace(std::ifstream &input)
     }
 }
 
+/**
+Function prints all Word objects in m_words vector
+*/
 void Concordance::print()
 {
     for(int i=0; i<m_words.size(); i++)
