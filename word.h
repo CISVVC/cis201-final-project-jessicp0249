@@ -16,14 +16,14 @@ class Word
 {
 private:
     std::string m_spelling;
-    vector<int> m_line_number;
+    std::vector<int> m_line_number;
     int m_count;
 
 public:
     Word(std::string spelling, int line);
     std::string get_spelling();
     void occurs_again_at(int line);
-    void print_word()
+    void print_word();
 
 };
 
